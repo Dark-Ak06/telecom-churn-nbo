@@ -97,9 +97,11 @@ def boosting_model(max_leaf_nodes: int = 31, max_iter: int = 130) -> Pipeline:
 
 def evaluate_model(test: pd.DataFrame, scores: np.ndarray) -> dict:
     actual = test["churn"].to_numpy()
-    if scores.shape != actual.shape or not np.isfinite(scores).all() or (
-        (scores < 0) | (scores > 1)
-    ).any():
+    if (
+        scores.shape != actual.shape
+        or not np.isfinite(scores).all()
+        or ((scores < 0) | (scores > 1)).any()
+    ):
         raise ValueError("Expected one finite churn probability per test row")
     if np.unique(actual).size != 2:
         raise ValueError("Churn metrics require both classes in the test set")
@@ -139,9 +141,9 @@ def train_churn(
 ) -> dict:
     require_mature_history(train, validation)
     require_mature_history(validation, test)
-    logistic = classifier_pipeline(
-        LogisticRegression(max_iter=500, random_state=RANDOM_SEED)
-    ).fit(train[FEATURES], train["churn"])
+    logistic = classifier_pipeline(LogisticRegression(max_iter=500, random_state=RANDOM_SEED)).fit(
+        train[FEATURES], train["churn"]
+    )
 
     candidates = {}
     validation_auc = {}

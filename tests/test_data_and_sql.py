@@ -76,9 +76,7 @@ def test_data_schema_and_duckdb_windows(tmp_path: Path) -> None:
 
 
 def test_duckdb_windows_with_known_answer(tmp_path: Path) -> None:
-    raw_path = generate_data(
-        tmp_path / "raw.parquet", n_users=2, as_of=date(2026, 11, 1)
-    )
+    raw_path = generate_data(tmp_path / "raw.parquet", n_users=2, as_of=date(2026, 11, 1))
     raw = pd.read_parquet(raw_path)
     one_user = raw.loc[raw["user_id"].eq(1)].iloc[[0, 1, 2, 4, 5]].copy()
     one_user["data_gb"] = [10, 20, 30, 80, 40]
@@ -98,9 +96,7 @@ def test_duckdb_windows_with_known_answer(tmp_path: Path) -> None:
 
 
 def test_sql_features_ignore_outcomes_and_future_observations(tmp_path: Path) -> None:
-    raw_path = generate_data(
-        tmp_path / "raw.parquet", n_users=30, as_of=date(2026, 11, 1)
-    )
+    raw_path = generate_data(tmp_path / "raw.parquet", n_users=30, as_of=date(2026, 11, 1))
     mart_path, eda_path = tmp_path / "mart.parquet", tmp_path / "eda.json"
     original = pd.read_parquet(build_features(raw_path, mart_path, eda_path))
     raw = pd.read_parquet(raw_path)
