@@ -1,226 +1,55 @@
-# Finance Analytics Dashboard 💰📊
+# Telecom Churn & Next Best Offer
 
-A portfolio-grade personal finance analytics tool built in Python. Load a
-transactions spreadsheet, clean it automatically, run a full battery of
-financial analytics, generate ten different charts, and produce a polished,
-color-formatted Excel report — all from a simple console dashboard.
+Портфельный MVP для команды Data Science телеком-оператора. Пайплайн создаёт панель из 300 000 наблюдений по 50 000 абонентов, прогнозирует отток на следующий месяц и назначает оффер, если ожидаемая маржа после затрат положительна.
 
-The repository ships **with sample data, generated charts, and a generated
-report already included**, so you can explore the output immediately without
-running anything. Re-running the pipeline regenerates all of it from scratch
-using a fresh (deterministic) sample dataset.
+[Live Dashboard](https://dark-ak06.github.io/telecom-churn-nbo/) · [Model Card](MODEL_CARD.md)
 
----
+## Бизнес-эффект MVP
 
-## Features
+На сентябрьском срезе с исходами за октябрь 2026 года ML NBO назначил оффер 11 351 из 50 000 абонентов. На синтетическом holdout оценка оттока снизилась на **2,94 п. п.**, чистый эффект за три месяца составил **+12,69 млн ₸**, ROI кампании — **238,1%**. 95%-й интервал чистого эффекта ML NBO составляет от 9,45 до 15,94 млн ₸.
 
-- **Automatic data cleaning**: removes empty rows and duplicates, validates
-  dates, fixes negative amounts, fills missing values, and logs every issue
-  it finds.
-- **Full financial analytics**: totals, averages, min/max, category
-  breakdowns, monthly trends with growth rates, and payment-method analysis.
-- **10 charts**: income/expense line charts, category pie charts, category
-  bar charts, a histogram, a boxplot, a scatter plot, and a category × month
-  heatmap.
-- **Polished Excel report** (`reports/Finance_Report.xlsx`) with 5 sheets:
-  `Summary`, `Transactions`, `Monthly Analysis`, `Categories`, `Charts` —
-  including colored headers, borders, currency/percentage formatting, and
-  conditional formatting (red for large expenses / negative profit, green
-  for positive profit).
-- **Interactive console dashboard** with a simple numbered menu.
-- **Sample data generator** producing 650+ realistic, randomized
-  transactions.
-- **Logging** to `logs/app.log`.
-- **15+ automated tests** with `pytest`.
+| Стратегия | Оценка оттока | Затраты | Чистый эффект к контролю | ROI |
+| --- | ---: | ---: | ---: | ---: |
+| Без действий | 20,55% | 0 ₸ | 0 ₸ | — |
+| Массовая скидка | 18,35% | 28,58 млн ₸ | −18,43 млн ₸ | −64,5% |
+| ML NBO | 17,61% | 5,33 млн ₸ | +12,69 млн ₸ | 238,1% |
 
----
+Для финансовой оценки применяется маржинальность 60–70% от ARPU в зависимости от тарифа. Контакт стоит 75 ₸, стоимость скидки или пакета начисляется при принятии оффера независимо от дальнейшего оттока. Трёхмесячная маржа удержанного абонента рассчитана при постоянном ARPU. Для переноса результата в кампанию нужен эксперимент с глобальной контрольной группой.
 
-## 🌐 Live interactive dashboard (GitHub Pages)
+Наблюдаемый отток при рандомизированных назначениях составил **19,67%**. HistGradientBoosting достиг **ROC-AUC 0,850**, **PR-AUC 0,690** и **Lift@10% 4,13×**. Среди 5 000 абонентов с наибольшим риском было 4 057 случаев оттока, или 41,26% всех тестовых случаев.
 
-This repository includes a **static, interactive website** in `docs/` —
-built with plain HTML/CSS/JS + [Plotly.js](https://plotly.com/javascript/)
-— that anyone can open in a browser and click around: hoverable charts, a
-category toggle (income/expense), a searchable and sortable transactions
-table with filters and pagination. No installation, no terminal, no
-Python required to view it.
+## Архитектура
 
-**To turn it on for your fork/repo:**
+```mermaid
+flowchart LR
+    A[Synthetic Telecom Data] --> B[DuckDB SQL Feature Mart]
+    B --> C[Temporal Split & Gradient Boosting]
+    C --> D[NBO Profit Optimizer]
+    D --> E[GitHub Pages Dashboard]
+    B --> E
+```
 
-1. Push this project to GitHub (see below if you haven't yet).
-2. In your repository, go to **Settings → Pages**.
-3. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-4. Under **Branch**, select `main` and folder **`/docs`**, then **Save**.
-5. Wait a minute, then GitHub shows the live URL at the top of that page —
-   usually `https://<your-username>.github.io/<repo-name>/`.
+SQL строит признаки из закрытого месяца и более ранней истории. Логистическая регрессия служит базовой моделью, бустинг учитывает нелинейные сочетания признаков. NBO моделирует риск оттока для каждого назначения и вероятность принятия коммерческих офферов. Стоимость скидки привязана к ARPU, стоимость пакетов фиксирована.
 
-That's it — the page is fully static and reads its data from
-`docs/data/dashboard_data.json`, which is regenerated automatically
-whenever you run the pipeline (see [Usage](#usage) below). Commit and push
-that file after regenerating it to update the live site.
+## Запуск
 
-### Previewing it locally before pushing
+В активном окружении Python 3.11 выполните две команды из корня проекта.
 
 ```bash
-cd docs
-python -m http.server 8000
+python -m pip install -r requirements.txt
+python -m src.run_pipeline
 ```
 
-Then open `http://localhost:8000` in your browser.
+Пайплайн использует seed 42 и по умолчанию воспроизводит аудит с датой среза 19 ноября 2026 года. Месяцы наблюдений идут с апреля по сентябрь, отток для последнего среза измеряется в октябре. Аргумент `--as-of YYYY-MM-DD` сдвигает окно. В него входят шесть месяцев наблюдений, для которых уже закрыт следующий месяц с исходами.
 
----
+| Результат | Файл |
+| --- | --- |
+| Синтетическая панель | `data/raw/telecom_usage.parquet` |
+| SQL-витрина | `data/processed/feature_mart.parquet` |
+| EDA по тарифам, регионам, месяцам и RFM | `artifacts/eda_summary.json` |
+| Метрики и кривые двух моделей | `artifacts/model_metrics.json` |
+| Лучшая модель | `artifacts/churn_model.joblib` |
+| Сравнение политик удержания | `artifacts/nbo_simulation.json` |
+| Интерактивный дашборд | `docs/index.html` |
 
-## Tech stack
-
-- Python 3.12+
-- pandas
-- openpyxl
-- matplotlib
-- numpy
-- pathlib
-- logging
-- pytest
-- black
-
----
-
-## Project structure
-
-```
-finance_analytics/
-│
-├── data/
-│   └── transactions.xlsx        # sample input data (already included)
-│
-├── reports/
-│   └── Finance_Report.xlsx      # generated Excel report (already included)
-│
-├── charts/
-│   └── *.png                    # 10 generated charts (already included)
-│
-├── docs/                        # interactive website (GitHub Pages)
-│   ├── index.html
-│   ├── style.css
-│   ├── script.js
-│   └── data/
-│       └── dashboard_data.json  # data consumed by the website (already included)
-│
-├── src/
-│   ├── loader.py                # reads the Excel input file
-│   ├── cleaner.py                # cleans and validates the data
-│   ├── analyzer.py               # computes all financial statistics
-│   ├── charts.py                 # generates all 10 charts
-│   ├── excel_report.py           # builds the formatted Excel report
-│   ├── web_export.py             # exports analysis results to docs/data/*.json
-│   ├── dashboard.py               # interactive console menu
-│   ├── generate_sample_data.py   # creates the sample transactions.xlsx
-│   └── main.py                    # entry point
-│
-├── tests/
-│   ├── test_loader.py
-│   ├── test_cleaner.py
-│   ├── test_analyzer.py
-│   ├── test_excel_report.py
-│   ├── test_web_export.py
-│   └── test_generate_sample_data.py
-│
-├── logs/
-│   └── app.log                    # runtime log file
-│
-├── requirements.txt
-├── pytest.ini
-├── README.md
-└── .gitignore
-```
-
----
-
-## Installation
-
-```bash
-git clone <your-repo-url>
-cd finance_analytics
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## Usage
-
-The project already contains sample data, charts and a generated report, so
-you can open `reports/Finance_Report.xlsx` right away. To regenerate
-everything (or run against your own data), use one of the two modes below.
-
-### Interactive dashboard
-
-```bash
-python src/main.py
-```
-
-```
-====================================
-   Finance Analytics Dashboard
-====================================
-1. Load data
-2. Clean data
-3. Run analysis
-4. Generate charts
-5. Build Excel report
-6. Show key KPIs
-7. Exit
-------------------------------------
-```
-
-### One-shot automatic run (no menu)
-
-```bash
-python src/main.py --auto
-```
-
-This loads `data/transactions.xlsx` (generating it automatically on first
-run if it doesn't exist), cleans it, runs the full analysis, regenerates all
-charts in `charts/`, rebuilds `reports/Finance_Report.xlsx`, refreshes
-`docs/data/dashboard_data.json` for the [live website](#-live-interactive-dashboard-github-pages),
-and prints the key KPIs to the console.
-
-From the interactive menu, option **5 (Build Excel report)** also refreshes
-the website's data file.
-
-### Using your own data
-
-Replace `data/transactions.xlsx` with your own file using the same columns:
-
-| Date | Type | Category | Description | Amount | Payment Method | Month |
-|------|------|----------|--------------|--------|-----------------|-------|
-| 2026-01-02 | Expense | Food | McDonald's | 5600 | Card | January |
-| 2026-01-05 | Income | Salary | January salary | 450000 | Bank | January |
-
-Then run `python src/main.py --auto` (or use the menu).
-
-### Regenerating just the sample data
-
-```bash
-python src/generate_sample_data.py
-```
-
----
-
-## Running the tests
-
-```bash
-pytest
-```
-
-Test coverage includes: Excel loading (valid file, missing file, missing
-columns), data cleaning (duplicates, empty rows, negative amounts, invalid
-dates, month recomputation), analytics (totals, category breakdowns,
-monthly profit, payment methods, full pipeline), Excel report generation
-(file creation, sheet presence, row counts), and sample data generation.
-
----
-
-
-
-
-## License
-
-This project is provided as-is for portfolio and educational purposes.
+HTML можно открыть локально. Для интерактивных графиков браузеру нужен доступ к CDN Plotly. Для автоматического деплоя выберите **GitHub Actions** в **Settings → Pages → Source**. Пуш в `main` запускает проверки, полную сборку и публикацию `docs/`. Pull request запускает проверки и сборку. [Документация GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
